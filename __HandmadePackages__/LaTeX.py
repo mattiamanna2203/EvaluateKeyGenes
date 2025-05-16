@@ -352,6 +352,39 @@ class LaTeX:
       # 6. Ritornare alla directory originaria per evitare errori.
       os.chdir(first_path)
 
+def knit(path):
+      """Questa funzione esterna alla classe prende in input il path di un file .tex ed esegue il knit"""
+      # I punti 1,2,3,4 sono aggiunti per avere il pdf del file nella stessa cartella ove questo risiede.
+
+      # CHECK 1 
+      if not isinstance(path,str):
+         raise TypeError("'path' deve essere una stringa")
+
+
+      # Estarre il nome del File LaTeX  e la sua estensione 
+      nome_file =  os.path.basename(path)            # Nome intero del file  
+      nome, estensione = os.path.splitext(nome_file) # Nome proprio ed estensione
+      
+      # CHECK 2, se l'estensione non è .tex ERRORE
+      if estensione != ".tex": 
+         raise TypeError("Richiesto un file  con estensione .tex")
+
+      # 1. Salvare il percorso file attuale, utile per poi potervici ritornare.
+      first_path = os.getcwd()  
+      
+      # 2. Identificare path della cartella ove è il file
+      percorso_cartella = re.sub(r"/[^/]+$", "", path) # Nome Cartella
+
+      # 3.  Muoversi nella cartella ove è il file
+      os.chdir(percorso_cartella)
+      
+      # Knittare il file LaTeX
+      with open(os.devnull, 'w') as FNULL:
+         subprocess.run(["pdflatex", path], stdout=FNULL, stderr=FNULL)  
+
+      # 4. Tornare alla cartella originale
+      os.chdir(first_path)
+
 if __name__ == "__main__":
    # Aggiungere il pacchetto allo script
    #sys.path.append('/Users/mattia/Desktop/Università/Data Science in Python/__pacchetti__')
@@ -389,4 +422,4 @@ if __name__ == "__main__":
    doc.add_table(df,include_index=False,intestazione_tabella="Tabella di prova")
 
    # Esportare il file LaTeX, va specificato il percorso file
-   doc.export("/Users/mattia/Desktop/Università/Magistrale/Tesi/Python Data Leakage GSE183635/fileprova.tex")
+   doc.export("/Users/mattia/Desktop/Università/Dottorato/EvaluateKeyGenes/fileprova.tex",knit=False)
