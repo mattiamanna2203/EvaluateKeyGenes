@@ -3,6 +3,7 @@ import numpy as np
 import subprocess
 import os
 import time
+import re
 class LaTeX:
    """Classe per creare report LaTeX.
       Permette di inizializzare un oggetto LaTeX e di aggiungerci:
@@ -285,55 +286,71 @@ class LaTeX:
 
    def export(self,
               path : str,
-              only_pdf: bool = True 
+              knit : bool = False
             ):
-      """Esportare il file LaTeX
-         - path: path + nome del file
-         - only_pdf: se mostrare anche il file tex,toc,aux,log,out o solo il pdf
+      """ Esportare il file LaTeX
+          Input:
+           - path: path + nome del file (con estensione) ;
+           - knit (opzionale, default False): se False crea solo il file .tex, se True fa anche il knit.
       """
       if not isinstance(path,str):
          raise TypeError(f"Il {self.__grassetto__('path')} deve essere una stringa")
 
       self.file_latex += "\end{document}"
 
-      # Creare il file latex
-      with open(path,'w+') as file:
-         file.write(self.file_latex)
+      # Separare dal path la cartella ove si vuole salvare ed il nome del file
+      percorso_cartella = re.sub(r"/[^/]+$", "", path) # Nome Cartella
+      nome_file =  os.path.basename(path)              # Nome File LaTeX 
+
+      # 1. Salvare il percorso file attuale, utile per poi potervici ritornare.
+      first_path = os.getcwd()  
+ 
+      # 2. Spostarsi al percorso file della cartella ove si vuole salvare il file.
+      os.chdir(percorso_cartella)      
+
+      # 3. Creare una cartella intitola LaTeX se non esiste già.
+      if 'LaTeX' not in os.listdir():
+         os.mkdir('LaTeX')   
+         
+      # 4. Spostarsi nella cartella LaTeX
+      os.chdir('LaTeX')      
       
+      # 5. Creare il file latex se non esiste già
+      if nome_file not in os.listdir():
+         with open(f"{percorso_cartella}/LaTeX/{nome_file}",'w+') as file:
+            file.write(self.file_latex)
+            
+         if knit: # Se Knit = True si procede al knit del file tex e quindi alla creazione del pdf
+            with open(os.devnull, 'w') as FNULL:
+               subprocess.run(["pdflatex", f"{percorso_cartella}/LaTeX/{nome_file}"], stdout=FNULL, stderr=FNULL)
+      else: # Se il file esiste già:
+         
+         # Copiare il nome file
+         new_nome_file = nome_file 
+         
+         # Iterare all'infinito finchè non si trova un nome che vada bene.
+         i = 2 # I nuovi nomi saranno quello iniziale con l'aggiunta di una costante
+         while True: 
+            new_nome_file = nome_file.replace(".tex","") # Rimuovere l'estensione
+            new_nome_file = f"{new_nome_file}_{i}.tex" # Aggiornare il nome del nuovo file: aggiungo COSTANTE ed l'estensione
+            
+            # Se il nuovo file non è presente nella directory salvarlo
+            if new_nome_file not in os.listdir():
+               with open(f"{percorso_cartella}/LaTeX/{new_nome_file}",'w+') as file:
+                  file.write(self.file_latex)
+               
+               if knit: # Se Knit = True si procede al knit del file tex e quindi alla creazione del pdf
+                  with open(os.devnull, 'w') as FNULL:
+                     subprocess.run(["pdflatex", f"{percorso_cartella}/LaTeX/{new_nome_file}"], stdout=FNULL, stderr=FNULL)
+               # Descrivere l'accaduto e printare il nuovo nome
+               print(f"File {nome_file} già presente, salvato con nome: {new_nome_file}")
+               break # Uscire dal while loop
+            
+            i +=1 # Aggiornare la costante
   
 
-      # Fare il knit del documento senza mostrare print
-      with open(os.devnull, 'w') as FNULL:
-         subprocess.run(["pdflatex", path], stdout=FNULL, stderr=FNULL)
-
-      # Nascondere i file per creare il pdf se si vuole solo il pdf
-      if only_pdf:
-         # linea di codice per nascondere i files
-         # chflags hidden "/Users/mattia/Desktop/Universita?<0080>/Data Science in Python/08) Classificazione/LogisticRegression.toc" 
- 
-         if os.path.exists(path):
-            subprocess.run(["chflags", "hidden", path])
-
-         file = path.replace(".tex",".aux")
-         if os.path.exists(file):
-            subprocess.run(["chflags", "hidden", file])
-
-         file = path.replace(".tex",".log")
-         if os.path.exists(file):
-            subprocess.run(["chflags", "hidden", file])
-
-         file = path.replace(".tex",".out")
-         if os.path.exists(file):
-            subprocess.run(["chflags", "hidden", file])
-
-         file = path.replace(".tex",".toc")
-         if os.path.exists(file):
-            subprocess.run(["chflags", "hidden", file])
-
-      # Fare il knit del documento senza mostrare print, ripetuto due volte sennò non dava i contents
-      with open(os.devnull, 'w') as FNULL:
-         subprocess.run(["pdflatex", path], stdout=FNULL, stderr=FNULL)
-   
+      # 6. Ritornare alla directory originaria per evitare errori.
+      os.chdir(first_path)
 
 if __name__ == "__main__":
    # Aggiungere il pacchetto allo script

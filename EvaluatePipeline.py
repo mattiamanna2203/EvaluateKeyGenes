@@ -1,4 +1,4 @@
-
+# Richiede python 3.9 o successivi. (Dovuto a from typing import Annotated)
 import pandas as pd 
 import random
 
@@ -22,7 +22,6 @@ class Evaluate:
       Prende in input dati di TRAIN e TEST e il nome del modello di classificazione binaria da utilizzare.
       Restituisce le performance ottenute. 
    """
-
 
    # Inizializzazione dell'oggetto
    # DA CAPIRE !!! -> Passare un pandas dataframe, il suo percorso file, o entrambe le possibilità? Sicuramente con entrambe non sbagli. Per ora solo pandas dataframe
@@ -91,11 +90,17 @@ class Evaluate:
          print(f"Seed utilizzato: {self.seed}")
          print(self.labels)
          
-   def SupportVectorClassifier(self):
+   def SupportVectorClassifier(self,
+                               verbose : bool = False):
       """ 
       Funzione per richiamare il Support vector classifier. 
       Classificazione binaria che utilizza i TRAIN e TEST specificati nell'inizializzazione della classe.
+      Parametri:
+         - verbose (opzionale, booleano), se True più output mostrato a schermo.
       """
+      if not isinstance(verbose,bool):
+         raise TypeError("'verbose' deve essere un booleano")      
+
       # Definizion del modello (ignorata definizione hyper parameters)
       model = SVC(random_state=self.seed)
 
@@ -105,28 +110,36 @@ class Evaluate:
       # Testare il modello e ottenere predizioni
       predizioni = model.predict(self.test_X)
 
+      self.SupportVectorClassifierParameters = model.get_params()
+
       # Calcolo metriche di performance 
       self.SupportVectorClassifierResults  = evaluate_performance.performance_binary(test_y = self.test_Y,
                                                                                      predizioni = predizioni,
-                                                                                     labels_float = self.labels)
+                                                                                     labels_float = self.labels,
+                                                                                     verbose = verbose
+                                                                                     )
 
    def SupportVectorClassifierKFold(self,   
-                                       metric_to_optimize: Literal['accuracy','f1','precision', 'recall'] = 'accuracy', # Metrica da ottimizzare
-                                       stratify : bool = True, # Bilanciare o meno TRAIN e VALIDATION set
-                                       fold : int = 5, # Numero di Fold 
-                                       param_grid: dict = { 'C': [0.1, 1, 10, 100],   # Esempio di valori per il parametro C
-                                                            'kernel': ['linear', 'rbf'],# Sperimenta sia kernel lineari che RBF
-                                                            'gamma': ['scale', 'auto']  # Opzioni per il parametro gamma
-                                                            }
-                                       ):
+                                    metric_to_optimize: Literal['accuracy','f1','precision', 'recall'] = 'accuracy', # Metrica da ottimizzare
+                                    class_to_optimize : int = 1,
+                                    stratify : bool = True, # Bilanciare o meno TRAIN e VALIDATION set
+                                    fold : int = 5, # Numero di Fold 
+                                    param_grid: dict = { 'C': [0.1, 1, 10, 100],   # Esempio di valori per il parametro C
+                                                         'kernel': ['linear', 'rbf'],# Sperimenta sia kernel lineari che RBF
+                                                         'gamma': ['scale', 'auto']  # Opzioni per il parametro gamma
+                                                         },
+                                    verbose = False
+                                    ):
       """ 
       Funzione per richiamare il Support vector classifier con ottimizzazione degli hyperparamaters tramite Kfold.
       Classificazione binaria che utilizza i TRAIN e TEST specificati nell'inizializzazione della classe.
       Prende in input i seguenti parametri:
          - metric_to_optimize: ["accuracy","f1score","recall","precision"];
+         - class_to_optimize: classe da ottimizzare [0,1];
          - stratify: ["True","False"] True per dividere TRAIN e VALIDATION set in maniera bilanciata rispetto alle y;
          - fold: Deve essere un intero, numero di fold per il KFold;
          - parama_grid: Dizionario degli hyper parametri da ottimizzare.
+         - verbose (opzionale, booleano), se True più output mostrato a schermo.
       """
       if not isinstance(stratify,bool):
          raise TypeError(f"'stratify' deve essere un booleano")      
@@ -137,9 +150,14 @@ class Evaluate:
       if not isinstance(param_grid,dict):
          raise TypeError(f"'parama_grid' deve essere un dizionario")      
 
+      if not isinstance(class_to_optimize,int):
+         raise TypeError(f"'class_to_optimize' deve essere un intero")      
+      
+      if class_to_optimize not in {0,1}:
+         raise ValueError(f"'class_to_optimize' deve essere 0 oppure 1")   
+
       if metric_to_optimize not in ['accuracy','f1','precision', 'recall']:
          raise ValueError(f"'metric_to_optimize' devere essere in {['accuracy','f1','precision', 'recall']}")
-      
 
       score = {"accuracy":accuracy_score,"f1":f1_score,"recall":recall_score,"precision":precision_score}
          
@@ -170,7 +188,7 @@ class Evaluate:
       base_model = SVC(random_state = self.seed)
    
       # Parametro da ottimizzare durante il GridSearchCV
-      custom_scorer = make_scorer(score[metric_to_optimize], average=None, labels=[0])
+      custom_scorer = make_scorer(score[metric_to_optimize], average=None, labels=[class_to_optimize])
    
       # Definire il GridSearchCV
       grid_search = GridSearchCV(estimator=base_model,  # Modello di classificazione 
@@ -183,6 +201,8 @@ class Evaluate:
       # Fornire al GridSearchCV i dati, in questo modo si addestrano gli hyperparametri.
       grid_search.fit(X_val, y_val)
       
+      self.SupportVectorClassifierKFoldParametri = grid_search.best_params_
+
       # Definire il modello finale utilizzando i hyperparameters ottimizzati tramite GridSearchCV
       final_model = SVC(**grid_search.best_params_, random_state = self.seed)#,probability=True)
    
@@ -192,16 +212,27 @@ class Evaluate:
       # Ottenere predizioni utilizzando il modello finale per poterlo valutare
       predizioni = final_model.predict(self.test_X)
    
+      if verbose:
+         print("Parametri selezionati:")
+         print(grid_search.best_params_)
+
       # Valutare le performance del modello tramite funzione esterna
       self.SupportVectorClassifierKFoldResults  = evaluate_performance.performance_binary(test_y = self.test_Y,
-                                                                                                 predizioni = predizioni,
-                                                                                                 labels_float = self.labels)
+                                                                                          predizioni = predizioni,
+                                                                                          labels_float = self.labels,
+                                                                                          verbose = verbose
+                                                                                          )
 
-   def LogisticRegression(self):
+   def LogisticRegression(self,
+                          verbose : bool = False):                          
       """ 
       Funzione per richiamare la Logistic Regression.
       Classificazione binaria che utilizza i TRAIN e TEST specificati nell'inizializzazione della classe.
+      Parametri:
+         - verbose (opzionale, booleano), se True più output mostrato a schermo.
       """
+      if not isinstance(verbose,bool):
+         raise TypeError("'verbose' deve essere un booleano")      
       # Definizion del modello (ignorata definizione hyper parameters)
       model = LogisticRegression(max_iter=10000,
                                  random_state=self.seed)
@@ -212,10 +243,14 @@ class Evaluate:
       # Testare il modello e ottenere predizioni
       predizioni = model.predict(self.test_X)
 
+      self.LogisticRegressionParameters = model.get_params()
+
       # Calcolo metriche di performance 
       self.LogisticRegressionResults  = evaluate_performance.performance_binary(test_y = self.test_Y,
                                                                                 predizioni = predizioni,
-                                                                                labels_float=self.labels)
+                                                                                labels_float=self.labels,
+                                                                                verbose=verbose
+                                                                                )
 
    def RandomForest():
       """
@@ -237,29 +272,63 @@ class Evaluate:
 
 
    # Calcolo delle performance
-   def get_performance(self,
-                        modelli: List[Annotated[str, Literal['SVC', 'SVC_KF', 'LR']]], # Specificare modelli che si possono utilizzare,
+   def show_performance(self,
+                        modelli: List[Annotated[str, Literal['SVC', 'SVC_KF', 'LR']]], # Specificare modelli che si possono richiedere
                         verbose : bool = True
                      ):
-
+      """
+      Questa funzione prende in input:
+         - modelli ['SVC', 'SVC_KF', 'LR']: modelli per i quali si vogliono ottenere gli output;
+         - verbose (opzionale): se mostrare (verbose = True) a schermo i risultati delle performance dei modelli specificati;
+      Gli output  dei modelli che si otteranno sono:
+         - risultati della classificazione in formato dataframe (due versioni distinte):
+         - hyperparametri dei modelli.
+      """
       print("\n\n")
+      
+      risultati = {}
+
+
+      # Logistic Regression
       if   "LR" in modelli:
-         print("Logistic Regression")
-         display(self.LogisticRegressionResults["df_report"])    ## Risultati per classe
-         display(self.LogisticRegressionResults["df_report_cm"]) ## Risultati relativi alla classe positiva (codifica 1)
-         
+         if verbose: # Se verbose = True mostra a schermo i risultati della classificazione
+            print("Logistic Regression")
+            display(self.LogisticRegressionResults["df_report"])    ## Risultati per classe
+            display(self.LogisticRegressionResults["df_report_cm"]) ## Risultati relativi alla classe positiva (codifica 1)
+        
+         risultati["LR"] = { "df_report":   self.LogisticRegressionResults["df_report"],
+                             "df_report_cm":self.LogisticRegressionResults["df_report_cm"],
+                             "parametri":   self.LogisticRegressionParameters # Parametri di default
+                           }
+   
+      # Support vector classifier
       if  "SVC" in modelli:
-         print("Support Vector Classifier")
-         display(self.SupportVectorClassifierResults["df_report"])    ## Risultati per classe
-         display(self.SupportVectorClassifierResults["df_report_cm"]) ## Risultati relativi alla classe positiva (codifica 1)
-         display(self.SupportVectorClassifierResults["df_report_classi"])
-         
+         if verbose: # Se verbose = True mostra a schermo i risultati della classificazione
+            print("Support Vector Classifier")
+            display(self.SupportVectorClassifierResults["df_report"])    ## Risultati per classe
+            display(self.SupportVectorClassifierResults["df_report_cm"]) ## Risultati relativi alla classe positiva (codifica 1)
+            
+         risultati["SVC"] = { "df_report":   self.SupportVectorClassifierResults["df_report"],
+                              "df_report_cm":self.SupportVectorClassifierResults["df_report_cm"],
+                              "parametri" :  self.SupportVectorClassifierParameters # Parametri di default
+                            }
+
+      # Support vector classifier con ottimizzazione hyperparameters tramite KFold   
       if  "SVC_KF" in modelli:
-         print("Support Vector Classifier KFold")
-         display(self.SupportVectorClassifierKFoldResults["df_report"])    ## Risultati per classe
-         display(self.SupportVectorClassifierKFoldResults["df_report_cm"]) ## Risultati relativi alla classe positiva (codifica 1)
+         if verbose: # Se verbose = True mostra a schermo i risultati della classificazione
+            print("Support Vector Classifier KFold")
+            display(self.SupportVectorClassifierKFoldResults["df_report"])    ## Risultati per classe
+            display(self.SupportVectorClassifierKFoldResults["df_report_cm"]) ## Risultati relativi alla classe positiva (codifica 1)
          
-      return 
+         risultati["SVC_KF"] = { "df_report":   self.SupportVectorClassifierResults["df_report"],
+                                 "df_report_cm":self.SupportVectorClassifierResults["df_report_cm"],
+                                 "parametri":   self.SupportVectorClassifierKFoldParametri # In aggiunta ha i parametri migliori scelti per la classificazione
+                               }       
+         
+
+
+
+      return  risultati
       
 
    def get_report(self,

@@ -49,19 +49,13 @@ def performance_binary(test_y : np.ndarray,
    specificity_1 = TN / (TN + FP)  # Specificità per classe 1 = TN della classe 1
    specificity_0 = TP / (TP + FN)  # Specificità per classe 0 = TN rispetto alla classe 0 (simmetrico)
 
+   # Specificando average = None si riesce a 
    precision = precision_score(test_y, predizioni, average=None)
    recall = recall_score(test_y, predizioni, average=None)
    f1 = f1_score(test_y, predizioni, average=None)
 
 
-   metrics_scikit_learn= {
-         'Accuracy': accuracy_score(test_y, predizioni),
-         'Precision': precision_score(test_y, predizioni),
-         'Recall': recall_score(test_y, predizioni),
-         'Specificity':specificity_1,
-         'F1-Score': f1_score(test_y, predizioni)
-      }
-   
+   # Unire in un dizionario tutte le metriche di performance riguardanti la classe 0
    metrics_scikit_learn_class0 = {
       'Accuracy': accuracy_score(test_y, predizioni),
       'Precision': precision[0],
@@ -70,6 +64,7 @@ def performance_binary(test_y : np.ndarray,
       'Specificity': specificity_0,
    }
    
+   # Unire in un dizionario tutte le metriche di performance riguardanti la classe 1
    metrics_scikit_learn_class1 = {
       'Accuracy': accuracy_score(test_y, predizioni),
       'Precision': precision[1],
@@ -78,27 +73,28 @@ def performance_binary(test_y : np.ndarray,
       'Specificity': specificity_1,
    }
    
+   # Classe 0, inserire le metriche dentro un pandas dataframe per un print migliore
    df_report_classi0 = pd.DataFrame.from_dict(metrics_scikit_learn_class0,orient="index").T
-   df_report_classi0.rename(index={0: f"{labels_float['0']}"}, inplace=True)
+   df_report_classi0.rename(index={0: f"{labels_float['0']}"}, inplace=True) # rinominare indice di riga con nome patologia es. GBM
    
+   # Classe 1, inserire le metriche dentro un pandas dataframe per un print migliore
    df_report_classi1 = pd.DataFrame.from_dict(metrics_scikit_learn_class1,orient="index").T
-   df_report_classi1.rename(index={0: f"{labels_float['1']}"}, inplace=True)
+   df_report_classi1.rename(index={0: f"{labels_float['1']}"}, inplace=True) # rinominare indice di riga con nome patologia es. HC
    
+   # Unire le due classi in un unico dataframe per un output migliore
    df_report_classi = pd.concat([df_report_classi0,df_report_classi1])
 
-   df_report_cm = pd.DataFrame.from_dict(metrics_scikit_learn,orient="index").T
-   df_report_cm.rename(index={0: "metrics (class 1)"}, inplace=True)
+
 
    # region Verbose
    if verbose:
       display(df_report)
-      display(df_report_cm)
+      display(df_report_classi)
 
 
    # endregion
    output = { "df_report":df_report,
-              "df_report_cm":df_report_cm,
-              "df_report_classi":df_report_classi 
+              "df_report_cm":df_report_classi 
             }
    return output
 
