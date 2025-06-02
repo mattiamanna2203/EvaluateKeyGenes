@@ -127,10 +127,11 @@ class LaTeX:
                              \\usepackage{hyperref} 
                               \\hypersetup{
                                  colorlinks=false,
-                                 pdfborder={0 0 0},
+                                 pdfborder={0 0 0}
                               }\n\n       
 
                              \\setcounter{tocdepth}{2} 
+                             \\setlength{\\parindent}{0pt}
                           """  
 
       # Aggiungere le distanze dai margini
@@ -185,20 +186,35 @@ class LaTeX:
       """Aggiungere una nuova pagina"""
       self.file_latex += "\n \\newpage \n"
 
+   def new_line(self):
+      """Andare a capo"""
+      self.file_latex += "\\\\"
+      
+   def add_empty_line(self):
+      """Andare a capo"""
+      self.file_latex += "\n"
+
+   def newline_emptyline(self):
+      """Andare a capo"""
+      self.file_latex += "\\\\ \n\n"
+
    def add_text(self,testo : str ):
       """Aggiungere del testo"""
       if not isinstance(testo,str):
                raise TypeError(f"Specificare una stringa per il parametro {self.__grassetto__('testo')}")
+      
+      testo = testo.replace("_","\\_")
       self.file_latex += testo
-
       self.file_latex += "\n"
+      del testo
 
    def add_section(self,nome_sezione : str):
       """ Aggiungere una sezione con il suo titolo"""
 
       if not isinstance(nome_sezione,str):
          raise TypeError(f"Specificare una stringa per il parametro {self.__grassetto__('nome_sezione')}")
-
+      
+      nome_sezione = nome_sezione.replace("_","\\_")
       self.file_latex += "\\section{" + nome_sezione + "} \n"
 
    def add_subsection(self,nome_subsection:str):
@@ -207,6 +223,7 @@ class LaTeX:
       if not isinstance(nome_subsection,str):
          raise TypeError(f"Specificare una stringa per il parametro {self.__grassetto__('nome_subsection')}")
 
+      nome_subsection = nome_subsection.replace("_","\\_")
       self.file_latex += "\\subsection{" + nome_subsection + "} \n"
 
    def add_subsubsection(self,nome_subsubsection:str):
@@ -215,8 +232,9 @@ class LaTeX:
       if not isinstance(nome_subsubsection,str):
          raise TypeError(f"Specificare una stringa per il parametro {self.__grassetto__('nome_subsubsection')}")
 
+      nome_subsubsection = nome_subsubsection.replace("_","\\_")
       self.file_latex += "\\subsubsection{" + nome_subsubsection + "} \n"
-
+      
    def add_table(self,
                  dataframe : pd.DataFrame(),
                  include_index : bool = True, 
@@ -270,11 +288,11 @@ class LaTeX:
 
       # region Aggiungere la tabella al file LaTeX
       if len(intestazione_tabella) > 0:
-         latex_table = '\n\n\\begin{table}[h!]\n\\centering\n\\caption{' + intestazione_tabella + '} '+ latex_output +' \n\n\n\\end{table}'
+         latex_table = '\n\n\\begin{table}[h!]\n\\centering\n\\caption{' + intestazione_tabella + '} \n'+ latex_output +'\\end{table}'
 
 
       else:
-         latex_table = '\n\n\\begin{table}[h!]\n\\centering'+ latex_output +'\n\n\n\\end{table}'
+         latex_table = '\n\n\\begin{table}[h!]\n\\centering'+ latex_output +'\\end{table}'
 
       latex_table = latex_table.replace("#","\\#")
       latex_table = latex_table.replace("_","\\_")
@@ -290,16 +308,18 @@ class LaTeX:
             ):
       """ Esportare il file LaTeX
           Input:
-           - path: path + nome del file (con estensione) ;
+           - path: path + nome del file (con estensione) (non deve contenere virgole o caratteri speciali);
            - knit (opzionale, default False): se False crea solo il file .tex, se True fa anche il knit.
       """
       if not isinstance(path,str):
-         raise TypeError(f"Il {self.__grassetto__('path')} deve essere una stringa")
+         raise TypeError(f"Il  {self.__grassetto__('path')} deve essere una stringa")
+
 
       self.file_latex += "\end{document}"
 
       # Separare dal path la cartella ove si vuole salvare ed il nome del file
-      percorso_cartella = re.sub(r"/[^/]+$", "", path) # Nome Cartella
+      #percorso_cartella = re.sub(r"/[^/]+$", "", path) # Nome Cartella
+      percorso_cartella = os.path.dirname(path)
       nome_file =  os.path.basename(path)              # Nome File LaTeX 
 
       # 1. Salvare il percorso file attuale, utile per poi potervici ritornare.
@@ -322,7 +342,7 @@ class LaTeX:
             
          if knit: # Se Knit = True si procede al knit del file tex e quindi alla creazione del pdf
             with open(os.devnull, 'w') as FNULL:
-               subprocess.run(["pdflatex", f"{percorso_cartella}/LaTeX/{nome_file}"], stdout=FNULL, stderr=FNULL)
+               subprocess.run(["pdflatex","-interaction=nonstopmode", f"{percorso_cartella}/LaTeX/{nome_file}"], stdout=FNULL, stderr=FNULL)
       else: # Se il file esiste già:
          
          # Copiare il nome file
@@ -341,7 +361,7 @@ class LaTeX:
                
                if knit: # Se Knit = True si procede al knit del file tex e quindi alla creazione del pdf
                   with open(os.devnull, 'w') as FNULL:
-                     subprocess.run(["pdflatex", f"{percorso_cartella}/LaTeX/{new_nome_file}"], stdout=FNULL, stderr=FNULL)
+                     subprocess.run(["pdflatex", "-interaction=nonstopmode",f"{percorso_cartella}/LaTeX/{new_nome_file}"], stdout=FNULL, stderr=FNULL)
                # Descrivere l'accaduto e printare il nuovo nome
                print(f"File {nome_file} già presente, salvato con nome: {new_nome_file}")
                break # Uscire dal while loop
@@ -353,7 +373,9 @@ class LaTeX:
       os.chdir(first_path)
 
 def knit(path):
-      """Questa funzione esterna alla classe prende in input il path di un file .tex ed esegue il knit"""
+      """Questa funzione esterna alla classe prende in input il path di un file .tex ed esegue il knit
+         Il path non deve contenere virgole o caratteri speciali.
+      """
       # I punti 1,2,3,4 sono aggiunti per avere il pdf del file nella stessa cartella ove questo risiede.
 
       # CHECK 1 
@@ -373,14 +395,15 @@ def knit(path):
       first_path = os.getcwd()  
       
       # 2. Identificare path della cartella ove è il file
-      percorso_cartella = re.sub(r"/[^/]+$", "", path) # Nome Cartella
-
+      #percorso_cartella = re.sub(r"/[^/]+$", "", path) # Nome Cartella
+      percorso_cartella = os.path.dirname(path)
+     
       # 3.  Muoversi nella cartella ove è il file
       os.chdir(percorso_cartella)
       
       # Knittare il file LaTeX
       with open(os.devnull, 'w') as FNULL:
-         subprocess.run(["pdflatex", path], stdout=FNULL, stderr=FNULL)  
+         subprocess.run(["pdflatex","-interaction=nonstopmode", path], stdout=FNULL, stderr=FNULL)  
 
       # 4. Tornare alla cartella originale
       os.chdir(first_path)

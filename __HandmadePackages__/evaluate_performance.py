@@ -34,13 +34,28 @@ def performance_binary(test_y : np.ndarray,
    # Trasformare il report di perfomance in un formato più leggibile (pandas dataframe e rinominare classi da numeriche ad categoriche ovvero i nomi originali)
    df_report = pd.DataFrame.from_dict(report_scikit_learn)
 
-   if len(labels_float) > 0:
-      df_report.rename(columns=labels_float, inplace=True)
+   
    
 
    #-----#
    # Matrice di confusione
    cm = confusion_matrix(test_y, predizioni)
+   
+   if len(labels_float) > 0:
+      df_report.rename(columns=labels_float, inplace=True)
+      
+      # Crea un DataFrame con etichette
+      df_cm = pd.DataFrame(cm,
+         index=[f"Actual {labels_float['0']}", f"Actual {labels_float['1']}"],
+         columns=[f"Predicted {labels_float['0']}", f"Predicted {labels_float['1']}"]
+      )
+   else:
+      df_cm = pd.DataFrame(cm,
+         index=['Actual 0', 'Actual 1'],
+         columns=['Predicted 0', 'Predicted 1']
+      )
+
+
 
    # Ottenere metriche di performance dalla confusion matrix
    TN, FP, FN, TP = cm.ravel() # Estrazione dei valori dalla confusion matrix
@@ -91,10 +106,10 @@ def performance_binary(test_y : np.ndarray,
       display(df_report)
       display(df_report_classi)
 
-
    # endregion
    output = { "df_report":df_report,
-              "df_report_cm":df_report_classi 
+              "df_report_cm":df_report_classi,
+              "confusion_matrix":df_cm 
             }
    return output
 

@@ -4,6 +4,10 @@ import random
 
 from sklearn.svm import SVC 
 from sklearn.linear_model import LogisticRegression 
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.naive_bayes import BernoulliNB
+from sklearn.naive_bayes import GaussianNB
 
 from sklearn.model_selection import KFold, LeaveOneOut, GridSearchCV, StratifiedKFold, train_test_split
 from sklearn.metrics import  confusion_matrix, make_scorer, accuracy_score, f1_score, recall_score, precision_score
@@ -13,7 +17,7 @@ sys.path.append('/Users/mattia/Desktop/Università/Dottorato/EvaluateKeyGenes/_
 import evaluate_performance # Funzioni selfmade per valutare performance modelli
 
 
-from typing import Literal,List,Annotated  # LITERAL: Per usare type hints in Python, un modo per indicare esplicitamente il tipo di variabili, parametri e ritorni delle funzioni.
+from typing import Literal,List,Annotated,Optional  # LITERAL: Per usare type hints in Python, un modo per indicare esplicitamente il tipo di variabili, parametri e ritorni delle funzioni. Optional per parametri opzionali
 
 
 
@@ -70,25 +74,40 @@ class Evaluate:
       # Geni comuni al train dataset ed al test dataset
       train_genes = set(train_data.columns) # Prendere i nomi dei  geni nel TRAIN SET
       test_genes  = set(test_data.columns)  # Prendere i nomi dei geni nel TEST SET 
-      common_genes = list(train_genes.intersection(test_genes)) # Prendere i geni comuni trs TRAIN e TEST set
-      common_genes.remove(target_feature_name) # Rimuovere la variabile target dalla lista dei geni comumi
+      self.common_genes = list(train_genes.intersection(test_genes)) # Prendere i geni comuni trs TRAIN e TEST set
+      self.common_genes.remove(target_feature_name) # Rimuovere la variabile target dalla lista dei geni comumi
+
 
       # Definire i dataframe train e test per l'intero oggetto, saranno presi in considerazione solo geni comuni
-      self.train_X =  train_data[common_genes].copy()        # Count matrix di TRAIN
+      self.train_X =  train_data[self.common_genes].copy()        # Count matrix di TRAIN
       self.train_Y =  train_data[target_feature_name].copy() # variabili target di TRAIN
 
-      self.test_X =  test_data[common_genes].copy()        # Count matrix di TEST
+      self.test_X =  test_data[self.common_genes].copy()        # Count matrix di TEST
       self.test_Y =  test_data[target_feature_name].copy() # variabili target di TEST
 
 
 
       # Se verbose è TRUE mostrare a schermo dettagli su: Train, Test, geni comuni, seed scelto, labels.
+      self.train_data_shape = train_data.shape
+      self.test_data_shape = test_data.shape
+      
+      # Inizializzare indicatori di uso
+      # serviranno a capire se un modello è stato utilizzato, in questo modo si potranno gestire meglio gli output
+      self.LogisticRegression_called = False
+      self.SupportVectorClassifier_called = False
+      self.SupportVectorClassifierKFold_called = False
+      self.RandomForest_called = False
+      self.KNearestNeighbors_called = False
+      self.NaiveBayesBinomial_called = False
+      self.NaiveBayesGaussian_called = False
+
+
       if verbose:
-         print(f"train_data shape: {train_data.shape}")
-         print(f"test_data shape: {test_data.shape}")
-         print(f"Numero di geni comuni: {len(common_genes)}")
+         print(f"train_data shape: {self.train_data_shape}")
+         print(f"test_data shape: {self.test_data_shape}")
+         print(f"Numero di geni comuni: {len(self.common_genes)}")
          print(f"Seed utilizzato: {self.seed}")
-         print(self.labels)
+         print(f"Labels utilizzate: {self.labels}")
          
    def SupportVectorClassifier(self,
                                verbose : bool = False):
@@ -119,6 +138,8 @@ class Evaluate:
                                                                                      verbose = verbose
                                                                                      )
 
+      self.SupportVectorClassifier_called = True
+  
    def SupportVectorClassifierKFold(self,   
                                     metric_to_optimize: Literal['accuracy','f1','precision', 'recall'] = 'accuracy', # Metrica da ottimizzare
                                     class_to_optimize : int = 1,
@@ -222,6 +243,8 @@ class Evaluate:
                                                                                           labels_float = self.labels,
                                                                                           verbose = verbose
                                                                                           )
+      
+      self.SupportVectorClassifierKFold_called = True
 
    def LogisticRegression(self,
                           verbose : bool = False):                          
@@ -252,29 +275,159 @@ class Evaluate:
                                                                                 verbose=verbose
                                                                                 )
 
-   def RandomForest():
+      self.LogisticRegression_called = True
+     
+   def RandomForest(self,
+                    verbose : bool = False):            
       """
+      Funzione per richiamare la Logistic Regression.
       Classificazione binaria che utilizza i TRAIN e TEST specificati nell'inizializzazione della classe.
+      Parametri:
+         - verbose (opzionale, booleano), se True più output mostrato a schermo.
       """
-      pass
+      if not isinstance(verbose,bool):
+         raise TypeError("'verbose' deve essere un booleano")  
+         
+      # Per ora ignorati
+      possibili_parametri_RF = {'n_estimators': [50, 100, 150, 200],  # Numero di alberi nella foresta
+                           'max_depth': [None, 10, 20, 30],  # Profondità massima degli alberi
+                           'min_samples_split': [2, 5, 10],  # Numero minimo di campioni per dividere un nodo
+                           'min_samples_leaf': [1, 2, 4],  # Numero minimo di campioni per essere una foglia
+                           'max_features': ['auto', 'sqrt', 'log2'],  # Numero di caratteristiche da considerare per ogni divisione
+                         }
 
-   def KNearestNeighbors():
-      """Classificazione binaria che utilizza i TRAIN e TEST specificati nell'inizializzazione della classe."""
-      pass
+      # Definizion del modello (ignorata definizione hyper parameters)
+      model = model = RandomForestClassifier(random_state=self.seed)
 
-   def NaiveBayesBinomial():
-      """Classificazione binaria che utilizza i TRAIN e TEST specificati nell'inizializzazione della classe."""
-      pass
+      # Addestramento del modello su dati di train
+      model.fit(self.train_X, self.train_Y)
 
-   def NaiveBayesGaussian():
-      """Classificazione binaria che utilizza i TRAIN e TEST specificati nell'inizializzazione della classe."""
-      pass
+      # Testare il modello e ottenere predizioni
+      predizioni = model.predict(self.test_X)
 
+      self.RandomForestParameters = model.get_params()
+
+      # Calcolo metriche di performance 
+      self.RandomForestResults  = evaluate_performance.performance_binary(test_y = self.test_Y,
+                                                                          predizioni = predizioni,
+                                                                          labels_float=self.labels,
+                                                                           verbose=verbose
+                                                                          )
+      self.RandomForest_called = True
+
+   def KNearestNeighbors(self,
+                         verbose : bool = False):            
+      """
+      Funzione per richiamare la KNearestNeighbors.
+      Classificazione binaria che utilizza i TRAIN e TEST specificati nell'inizializzazione della classe.
+      Parametri:
+         - verbose (opzionale, booleano), se True più output mostrato a schermo.
+      """
+      if not isinstance(verbose,bool):
+         raise TypeError("'verbose' deve essere un booleano")  
+         
+      # Per ora ignorati
+      possibili_parametri_KNN = {'n_neighbors': [3, 5, 7, 10, 15],  # Numero di vicini da provare
+                                 'weights': ['uniform', 'distance'],  # Tipi di pesatura per i vicini
+                                 'metric': ['euclidean', 'manhattan']  # Differenti metriche di distanza
+                              }
+
+      # Definizion del modello (ignorata definizione hyper parameters)
+      model = KNeighborsClassifier() # non ha come parametro random_state
+
+      # Addestramento del modello su dati di train
+      model.fit(self.train_X, self.train_Y)
+
+      # Testare il modello e ottenere predizioni
+      predizioni = model.predict(self.test_X)
+
+      self.KNearestNeighborsParameters = model.get_params()
+
+      # Calcolo metriche di performance 
+      self.KNearestNeighborsResults  = evaluate_performance.performance_binary(test_y = self.test_Y,
+                                                                               predizioni = predizioni,
+                                                                               labels_float=self.labels,
+                                                                               verbose=verbose
+                                                                              )
+      self.KNearestNeighbors_called = True
+
+   def NaiveBayesBinomial(self,
+                         verbose : bool = False):            
+      """
+      Funzione per richiamare la Naive Bayes Binomial.
+      Classificazione binaria che utilizza i TRAIN e TEST specificati nell'inizializzazione della classe.
+      Parametri:
+         - verbose (opzionale, booleano), se True più output mostrato a schermo.
+      """
+      if not isinstance(verbose,bool):
+         raise TypeError("'verbose' deve essere un booleano")  
+         
+ 
+      # Per ora non utilizzati
+      possibili_parametri_NB_Binomial =  {'alpha': [0.1, 0.5, 1.0, 2.0],  # Parametro di regolarizzazione (default è 1.0)
+                                          'binarize': [0.0, 0.1, 0.5, 1.0],  # Soglia per binarizzare i dati (trasformare le caratteristiche in 0 o 1)
+                                       }
+
+      # Definizion del modello (ignorata definizione hyper parameters)
+      model =  BernoulliNB() # non ha come parametro random_state
+
+
+      # Addestramento del modello su dati di train
+      model.fit(self.train_X, self.train_Y)
+
+      # Testare il modello e ottenere predizioni
+      predizioni = model.predict(self.test_X)
+
+      self.NaiveBayesBinomialParameters = model.get_params()
+
+      # Calcolo metriche di performance 
+      self.NaiveBayesBinomialResults  = evaluate_performance.performance_binary(test_y = self.test_Y,
+                                                                               predizioni = predizioni,
+                                                                               labels_float=self.labels,
+                                                                               verbose=verbose
+                                                                              )
+      self.NaiveBayesBinomial_called = True
+
+   def NaiveBayesGaussian(self,
+                         verbose : bool = False):            
+      """
+      Funzione per richiamare la Naive Bayes Gaussian.
+      Classificazione binaria che utilizza i TRAIN e TEST specificati nell'inizializzazione della classe.
+      Parametri:
+         - verbose (opzionale, booleano), se True più output mostrato a schermo.
+      """
+      if not isinstance(verbose,bool):
+         raise TypeError("'verbose' deve essere un booleano")  
+         
+ 
+      # Possibili parametri, per ora non utilizzati
+      possibili_parametri_NB_Gaussian = { 'var_smoothing': [1e-9, 1e-8, 1e-7, 1e-6]  # Parametro per regolarizzare la varianza dei dati
+                                  }
+
+      # Definizion del modello (ignorata definizione hyper parameters)
+      model =  GaussianNB() # non ha come parametro random_state
+
+      # Addestramento del modello su dati di train
+      model.fit(self.train_X, self.train_Y)
+
+      # Testare il modello e ottenere predizioni
+      predizioni = model.predict(self.test_X)
+
+      self.NaiveBayesGaussianParameters = model.get_params()
+
+      # Calcolo metriche di performance 
+      self.NaiveBayesGaussianResults  = evaluate_performance.performance_binary(test_y = self.test_Y,
+                                                                               predizioni = predizioni,
+                                                                               labels_float=self.labels,
+                                                                               verbose=verbose
+                                                                              )
+      
+      self.NaiveBayesGaussian_called = True
 
    # Calcolo delle performance
    def show_performance(self,
-                        modelli: List[Annotated[str, Literal['SVC', 'SVC_KF', 'LR']]], # Specificare modelli che si possono richiedere
-                        verbose : bool = True
+                       modelli: Optional[List[Annotated[str, Literal['SVC', 'SVC_KF', 'LR','RF','KNN','NB_Binomial','NB_Gaussian']]]] = None,
+                       verbose : bool = True
                      ):
       """
       Questa funzione prende in input:
@@ -284,57 +437,144 @@ class Evaluate:
          - risultati della classificazione in formato dataframe (due versioni distinte):
          - hyperparametri dei modelli.
       """
-      print("\n\n")
+      
       
       risultati = {}
-
+      
+      # Se per un qualsiasi motivo si vogliono solo determinati modelli in output nonostante siano stati addestrati.
+      if modelli != None:
+         if 'LR' not in modelli:
+            self.LogisticRegression_called = False
+            
+         if 'SVC' not in modelli:
+            self.SupportVectorClassifier_called = False
+            
+         if 'SVC_KF'not in modelli:
+            self.SupportVectorClassifierKFold_called = False
+            
+         if 'RF' not in modelli:
+            self.RandomForest_called = False
+            
+         if 'KNN' not in modelli:
+            self.KNearestNeighbors_called = False
+            
+         if 'NB_Binomial' not in modelli:
+            self.NaiveBayesBinomial_called = False
+            
+         if 'NB_Gaussian' not in modelli:
+           self.NaiveBayesGaussian_called = False
 
       # Logistic Regression
-      if   "LR" in modelli:
+      if self.LogisticRegression_called:
+         
          if verbose: # Se verbose = True mostra a schermo i risultati della classificazione
+            print("\n\n")
             print("Logistic Regression")
             display(self.LogisticRegressionResults["df_report"])    ## Risultati per classe
             display(self.LogisticRegressionResults["df_report_cm"]) ## Risultati relativi alla classe positiva (codifica 1)
         
          risultati["LR"] = { "df_report":   self.LogisticRegressionResults["df_report"],
                              "df_report_cm":self.LogisticRegressionResults["df_report_cm"],
-                             "parametri":   self.LogisticRegressionParameters # Parametri di default
+                             "parametri":   self.LogisticRegressionParameters, # Parametri di default
+                             "confusion_matrix": self.LogisticRegressionResults["confusion_matrix"]
                            }
    
       # Support vector classifier
-      if  "SVC" in modelli:
+      if self.SupportVectorClassifier_called:
          if verbose: # Se verbose = True mostra a schermo i risultati della classificazione
+            print("\n\n")
             print("Support Vector Classifier")
             display(self.SupportVectorClassifierResults["df_report"])    ## Risultati per classe
             display(self.SupportVectorClassifierResults["df_report_cm"]) ## Risultati relativi alla classe positiva (codifica 1)
             
          risultati["SVC"] = { "df_report":   self.SupportVectorClassifierResults["df_report"],
                               "df_report_cm":self.SupportVectorClassifierResults["df_report_cm"],
-                              "parametri" :  self.SupportVectorClassifierParameters # Parametri di default
+                              "parametri" :  self.SupportVectorClassifierParameters, # Parametri di default,
+                              "confusion_matrix": self.SupportVectorClassifierResults["confusion_matrix"]
                             }
 
       # Support vector classifier con ottimizzazione hyperparameters tramite KFold   
-      if  "SVC_KF" in modelli:
+      if self.SupportVectorClassifierKFold_called:
          if verbose: # Se verbose = True mostra a schermo i risultati della classificazione
+            print("\n\n")
             print("Support Vector Classifier KFold")
             display(self.SupportVectorClassifierKFoldResults["df_report"])    ## Risultati per classe
             display(self.SupportVectorClassifierKFoldResults["df_report_cm"]) ## Risultati relativi alla classe positiva (codifica 1)
          
-         risultati["SVC_KF"] = { "df_report":   self.SupportVectorClassifierResults["df_report"],
-                                 "df_report_cm":self.SupportVectorClassifierResults["df_report_cm"],
-                                 "parametri":   self.SupportVectorClassifierKFoldParametri # In aggiunta ha i parametri migliori scelti per la classificazione
+         risultati["SVC_KF"] = { "df_report":   self.SupportVectorClassifierKFoldResults["df_report"],
+                                 "df_report_cm":self.SupportVectorClassifierKFoldResults["df_report_cm"],
+                                 "parametri":   self.SupportVectorClassifierKFoldParametri, # In aggiunta ha i parametri migliori scelti per la classificazione,
+                                 "confusion_matrix": self.SupportVectorClassifierKFoldResults["confusion_matrix"]
                                }       
          
-
-
-
-      return  risultati
+      # RandomForest classifier
+      if self.RandomForest_called:
+         if verbose: # Se verbose = True mostra a schermo i risultati della classificazione
+            print("\n\n")
+            print("Random Forest Classifier")
+            display(self.RandomForestResults["df_report"])    ## Risultati per classe
+            display(self.RandomForestResults["df_report_cm"]) ## Risultati relativi alla classe positiva (codifica 1)
+         
+         risultati["RF"] = { "df_report":   self.RandomForestResults["df_report"],
+                                 "df_report_cm":self.RandomForestResults["df_report_cm"],
+                                 "parametri":   self.RandomForestParameters, # In aggiunta ha i parametri migliori scelti per la classificazione,
+                                 "confusion_matrix": self.RandomForestResults["confusion_matrix"]
+                               }       
+            # RandomForest con ottimizzazione hyperparameters tramite KFold   
       
-
+      # K Nearest Neighbors classifier
+      if self.KNearestNeighbors_called:
+         if verbose: # Se verbose = True mostra a schermo i risultati della classificazione
+            print("\n\n")
+            print("K Nearest Neighbors classifier")
+            display(self.KNearestNeighborsResults["df_report"])    ## Risultati per classe
+            display(self.KNearestNeighborsResults["df_report_cm"]) ## Risultati relativi alla classe positiva (codifica 1)
+         
+         risultati["KNN"] = { "df_report":   self.KNearestNeighborsResults["df_report"],
+                                 "df_report_cm":self.KNearestNeighborsResults["df_report_cm"],
+                                 "parametri":   self.KNearestNeighborsParameters, # In aggiunta ha i parametri migliori scelti per la classificazione,
+                                 "confusion_matrix": self.KNearestNeighborsResults["confusion_matrix"]
+                               }       
+         
+      # Naive Bayes Binomial
+      if self.NaiveBayesBinomial_called:
+         if verbose: # Se verbose = True mostra a schermo i risultati della classificazione
+            print("\n\n")
+            print("K Nearest Neighbors classifier")
+            display(self.NaiveBayesBinomialResults["df_report"])    ## Risultati per classe
+            display(self.NaiveBayesBinomialResults["df_report_cm"]) ## Risultati relativi alla classe positiva (codifica 1)
+         
+         risultati["NB_Binomial"] = { "df_report":   self.NaiveBayesBinomialResults["df_report"],
+                                      "df_report_cm":self.NaiveBayesBinomialResults["df_report_cm"],
+                                       "parametri":   self.NaiveBayesBinomialParameters, # In aggiunta ha i parametri migliori scelti per la classificazione,
+                                       "confusion_matrix": self.NaiveBayesBinomialResults["confusion_matrix"]
+                                    }      
+          
+      # Naive Bayes Gaussian
+      if self.NaiveBayesGaussian_called:
+         if verbose: # Se verbose = True mostra a schermo i risultati della classificazione
+            print("\n\n")
+            print("K Nearest Neighbors classifier")
+            display(self.NaiveBayesGaussianResults["df_report"])    ## Risultati per classe
+            display(self.NaiveBayesGaussianResults["df_report_cm"]) ## Risultati relativi alla classe positiva (codifica 1)
+         
+         risultati["NB_Gaussian"] = { "df_report":   self.NaiveBayesGaussianResults["df_report"],
+                                      "df_report_cm":self.NaiveBayesGaussianResults["df_report_cm"],
+                                      "parametri":   self.NaiveBayesGaussianParameters, # In aggiunta ha i parametri migliori scelti per la classificazione,
+                                      "confusion_matrix": self.NaiveBayesGaussianResults["confusion_matrix"]
+                                    }       
+      
+      return risultati
+   
    def get_report(self,
                   parametri):
       pass
 
+   def get_good_results(self,thresholds = None):
+      """Estrarre solo i modelli nei quali le performance sono buone.
+         Threshold per identificare i modelli con buone performance.
+      """
+      pass
 
 
 # C'è da lavorare sull'output, aggiungere modelli, aggiungere le versioni con tuning dei modelli, commentare, inserire le doc string, capire come richiamare i vari modelli, inserire  RAISE ERROR, la creazione di report la escludo sarà fatta direttamente in fase di utilizzo per essere più flessibile.
