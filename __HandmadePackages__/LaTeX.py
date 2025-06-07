@@ -125,6 +125,8 @@ class LaTeX:
                              \\usepackage{lscape}  
                              \\usepackage{geometry} 
                              \\usepackage{hyperref} 
+                             \\usepackage[table]{xcolor}
+                              \\usepackage{colortbl} 
                               \\hypersetup{
                                  colorlinks=false,
                                  pdfborder={0 0 0}
@@ -132,6 +134,7 @@ class LaTeX:
 
                              \\setcounter{tocdepth}{2} 
                              \\setlength{\\parindent}{0pt}
+                             
                           """  
 
       # Aggiungere le distanze dai margini
@@ -238,13 +241,20 @@ class LaTeX:
    def add_table(self,
                  dataframe : pd.DataFrame(),
                  include_index : bool = True, 
-                 intestazione_tabella : str = ""):
+                 intestazione_tabella : str = "",
+                 separatore_righe : bool = False,
+                 colore_righe : bool = False
+               ):
       """Converte un pandas dataframe in una tabella LaTeX
          Input:
             - dataframe: dataframe da convertire in una tabella LaTeX
             - include_index (opzionale, default=True): se includere l'indice della tabella o meno 
             - intestazione_tabella (opzionale): se aggiungere un titolo alla tabella
+            - separatore_righe (opzionale, default = False): se vero vengono aggiunte hline.
+            - colore_righe (opzionale, default = False): se vero righe alternano di colore, bianco e grigio chiaro, facilità la comprensione.
       """
+      
+
 
       # region parametri di controllo input
       if not isinstance(include_index,bool):
@@ -280,19 +290,44 @@ class LaTeX:
          correzione_colonna = "\\textbf{" + colonna + "}"
          latex_output = latex_output.replace(colonna, correzione_colonna)
 
+
+
       latex_output = latex_output.replace("_"," ")
-      latex_output = latex_output.replace('\\toprule', '\\hline')  # Sostituisci top rule
-      latex_output = latex_output.replace('\\midrule', '\\hline')  # Sostituisci mid rule
-      latex_output = latex_output.replace('\\bottomrule', '\\hline')  # Sostituisci bottom rule
       # endregion
+
+      if separatore_righe:
+         latex_output = latex_output.replace("\\\\","\\\\ \\hline")
+         
+         # Se c'è il separatore_righe midrule  e bottomrule vanno rimossi
+         # e non sostituiti con hline, sennò  sarebbero sostituiti due volte da hline
+         latex_output = latex_output.replace('\\midrule', '')  # Sostituisci mid rule
+         latex_output = latex_output.replace('\\bottomrule', '')  # Sostituisci bottom rule
+         
+      else:
+         latex_output = latex_output.replace('\\midrule', '\\hline')  # Sostituisci mid rule
+         latex_output = latex_output.replace('\\bottomrule', '\\hline')  # Sostituisci bottom rule
+         
+         
+      latex_output = latex_output.replace('\\toprule', '\\hline')  # Sostituisci top rule
+      
+
 
       # region Aggiungere la tabella al file LaTeX
       if len(intestazione_tabella) > 0:
-         latex_table = '\n\n\\begin{table}[h!]\n\\centering\n\\caption{' + intestazione_tabella + '} \n'+ latex_output +'\\end{table}'
+         
+         # se si vuole l'alteranza righe aggiungere \\rowcolors{2}{white!100}{gray!20} alla table
+         if colore_righe:
+            latex_table = '\n\n\\begin{table}[h!]\n\\centering\n\\caption{' + intestazione_tabella + '}  	\\rowcolors{2}{white!100}{gray!20} \n'+ latex_output +'\\end{table}'
+         else:
+            latex_table = '\n\n\\begin{table}[h!]\n\\centering\n\\caption{' + intestazione_tabella + '}  \n'+ latex_output +'\\end{table}'
 
 
       else:
-         latex_table = '\n\n\\begin{table}[h!]\n\\centering'+ latex_output +'\\end{table}'
+         if colore_righe:
+            latex_table = '\n\n\\begin{table}[h!]\n\\centering \\rowcolors{2}{white!100}{gray!20}'+ latex_output +'\\end{table}'
+         else:
+            latex_table = '\n\n\\begin{table}[h!]\n\\centering'+ latex_output +'\\end{table}'
+
 
       latex_table = latex_table.replace("#","\\#")
       latex_table = latex_table.replace("_","\\_")
@@ -342,7 +377,19 @@ class LaTeX:
             
          if knit: # Se Knit = True si procede al knit del file tex e quindi alla creazione del pdf
             with open(os.devnull, 'w') as FNULL:
-               subprocess.run(["pdflatex","-interaction=nonstopmode", f"{percorso_cartella}/LaTeX/{nome_file}"], stdout=FNULL, stderr=FNULL)
+               subprocess.run(["pdflatex","-interaction=nonstopmode", f"{percorso_cartella}/LaTeX/{nome_file}"],
+                               stdout=FNULL,
+                               stderr=FNULL,
+                               cwd= f"{percorso_cartella}/LaTeX")
+
+            time.sleep(1)            
+
+            # Compilare due volte, in questo modo appare l'indice. LaTeX ha bisogno almeno di due run per compilare correttamente l'indice
+            with open(os.devnull, 'w') as FNULL:
+               subprocess.run(["pdflatex","-interaction=nonstopmode", f"{percorso_cartella}/LaTeX/{nome_file}"],
+                               stdout=FNULL,
+                                stderr=FNULL,
+                                cwd= f"{percorso_cartella}/LaTeX")
       else: # Se il file esiste già:
          
          # Copiare il nome file
@@ -361,7 +408,20 @@ class LaTeX:
                
                if knit: # Se Knit = True si procede al knit del file tex e quindi alla creazione del pdf
                   with open(os.devnull, 'w') as FNULL:
-                     subprocess.run(["pdflatex", "-interaction=nonstopmode",f"{percorso_cartella}/LaTeX/{new_nome_file}"], stdout=FNULL, stderr=FNULL)
+                     subprocess.run(["pdflatex", "-interaction=nonstopmode",f"{percorso_cartella}/LaTeX/{new_nome_file}"],
+                                     stdout=FNULL,
+                                    stderr=FNULL,
+                                    cwd= f"{percorso_cartella}/LaTeX")
+                     
+                  time.sleep(1)            
+
+                  # Compilare due volte, in questo modo appare l'indice. LaTeX ha bisogno almeno di due run per compilare correttamente l'indice
+                  with open(os.devnull, 'w') as FNULL:
+                     subprocess.run(["pdflatex","-interaction=nonstopmode", f"{percorso_cartella}/LaTeX/{new_nome_file}"],
+                                    stdout=FNULL,
+                                    stderr=FNULL,
+                                    cwd= f"{percorso_cartella}/LaTeX")
+  
                # Descrivere l'accaduto e printare il nuovo nome
                print(f"File {nome_file} già presente, salvato con nome: {new_nome_file}")
                break # Uscire dal while loop

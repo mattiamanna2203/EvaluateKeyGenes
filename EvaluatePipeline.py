@@ -424,46 +424,20 @@ class Evaluate:
       
       self.NaiveBayesGaussian_called = True
 
-   # Calcolo delle performance
-   def show_performance(self,
-                       modelli: Optional[List[Annotated[str, Literal['SVC', 'SVC_KF', 'LR','RF','KNN','NB_Binomial','NB_Gaussian']]]] = None,
+   def get_performance(self,
                        verbose : bool = True
                      ):
       """
       Questa funzione prende in input:
-         - modelli ['SVC', 'SVC_KF', 'LR']: modelli per i quali si vogliono ottenere gli output;
          - verbose (opzionale): se mostrare (verbose = True) a schermo i risultati delle performance dei modelli specificati;
       Gli output  dei modelli che si otteranno sono:
          - risultati della classificazione in formato dataframe (due versioni distinte):
          - hyperparametri dei modelli.
       """
       
-      
+      self.risultati = None
       risultati = {}
       
-      # Se per un qualsiasi motivo si vogliono solo determinati modelli in output nonostante siano stati addestrati.
-      if modelli != None:
-         if 'LR' not in modelli:
-            self.LogisticRegression_called = False
-            
-         if 'SVC' not in modelli:
-            self.SupportVectorClassifier_called = False
-            
-         if 'SVC_KF'not in modelli:
-            self.SupportVectorClassifierKFold_called = False
-            
-         if 'RF' not in modelli:
-            self.RandomForest_called = False
-            
-         if 'KNN' not in modelli:
-            self.KNearestNeighbors_called = False
-            
-         if 'NB_Binomial' not in modelli:
-            self.NaiveBayesBinomial_called = False
-            
-         if 'NB_Gaussian' not in modelli:
-           self.NaiveBayesGaussian_called = False
-
       # Logistic Regression
       if self.LogisticRegression_called:
          
@@ -564,11 +538,33 @@ class Evaluate:
                                       "confusion_matrix": self.NaiveBayesGaussianResults["confusion_matrix"]
                                     }       
       
+      self.risultati = risultati
       return risultati
    
    def get_report(self,
                   parametri):
       pass
+
+   def performance_summary(self, condition):
+      """Estrarre dai risultati una tabella con le sole performance per una determinata condizione per ogni classificatore
+         Funzione da utilizzare solo dopo get_performance.
+         condition: condizione di interesse per la quale visualizzare i risultati.   
+      """
+      summary = pd.DataFrame() 
+      
+      # Iterare su  ogni modello addestrato 
+      for modello in self.risultati.keys():
+         
+         # Per ogni modello estrarre il sommario relativo alla condizione scelta
+         model_summary = pd.DataFrame(self.risultati[modello]["df_report_cm"].loc[condition])
+         model_summary.rename(columns={condition:modello},inplace=True)         
+
+         # Inserire tutte le condizioni in un unico dataframe
+         summary = pd.concat([summary,model_summary],axis=1)
+
+      summary = summary.T
+
+      return summary
 
    def get_good_results(self,thresholds = None):
       """Estrarre solo i modelli nei quali le performance sono buone.
