@@ -5,7 +5,7 @@ La valutazione avviene tramite l'analisi delle metriche di performance.
 
 I file:
 - **EvaluatePipeline.py** contiene la classe Python;
-**__HandmadePackages__** folder contenente le classi e le funzioni di ausilio da me create per la classe contenenuta in **EvaluatePipeline.py**;
+- Nel folder **__HandmadePackages__**  contenente le classi e le funzioni di ausilio da me create per la classe contenenuta in **EvaluatePipeline.py**;
   	+  **current_time**: Contiene una funzione che se richiamata fornisce la data attuale, anno - mese - giorno - ora - minutii,  usata per semplicare i timestamp.
   	+ **evaluate_performance**: Contiene diverse funzioni per misurare le performance di diversi tipi di modelli di classificazione.
   	+ **LaTeX**: classe per la creazione di report pdf in python.
@@ -16,7 +16,7 @@ I file:
 - **Report esempio applicazione pratica.pdf** report proveniente dallo script descritto nel punto precedente;
 
 
-Nel folder __HandmadePackages__ vi sono le classi e le funzioni da me create per supportare la classe
+
 
 
 
