@@ -109,20 +109,94 @@ class Evaluate:
          print(f"Seed utilizzato: {self.seed}")
          print(f"Labels utilizzate: {self.labels}")
          
+   def __LeaveOneOut__(self,modello):
+      """Metodo privato per eseguire una leave one out classification.
+         Molto utile per verificare performance del modello nei train set.
+         Prende in input:
+         -  modello di classificazione da utilizzare
+         
+         In output restituisce:
+            - y_true: valori veri delle variabili target
+            - y_pred: valori predetti delle variabili target
+      """
+      # Define X and y
+      X = self.train_X.copy()
+      y = self.train_Y.copy()
+      
+      # Siccome loo.get_n_splits(X) utilizza come indici numeri, droppare i nomi dei pazienti e sostituirli con numeri per evitare errori
+      X.reset_index(drop=True,inplace=True)      
+      y.reset_index(drop=True,inplace=True)      
+
+      # Define LOOCV
+      loo = LeaveOneOut()
+      loo.get_n_splits(X)
+
+      # Define true and predict list
+      y_true,y_pred = [],[]
+      
+      # LeaveOneOut classification
+      for train_index, test_index in loo.split(X):
+         
+         # Dividere in Train e Test le variabili esplicative
+         X_train, X_test = X.loc[train_index], X.loc[test_index]
+         
+         # Dividere in train e test la variabile target
+         y_train, y_test = y.loc[train_index], y.loc[test_index]
+         
+         # Inizializzare modello per l'iesima previsione sulla iesima riga
+         model = modello
+         
+         # Fittare il modello per l'iesima previsione sulla iesima riga
+         model.fit(X_train,y_train)
+         
+         # Ottenere la prediction
+         yhat = model.predict(X_test)
+         
+         # Salvare il vero valore della variabile target
+         y_true.append(y_test)
+         
+         # Salvare la predizione del modello per la variabile target
+         y_pred.append(yhat)
+         
+
+      return y_true,y_pred
+
    def SupportVectorClassifier(self,
+                               train : bool = False,
                                verbose : bool = False):
       """ 
       Funzione per richiamare il Support vector classifier. 
       Classificazione binaria che utilizza i TRAIN e TEST specificati nell'inizializzazione della classe.
       Parametri:
          - verbose (opzionale, booleano), se True più output mostrato a schermo.
+         - train (opzionale, booleano), se True viene testato il modello anche sul train set.
       """
       if not isinstance(verbose,bool):
          raise TypeError("'verbose' deve essere un booleano")      
+      
+      if not isinstance(train,bool):
+         raise TypeError("'train' deve essere un booleano")   
 
-      # Definizion del modello (ignorata definizione hyper parameters)
+      # Check performance sul dati di TRAIN
+      # Il check e la scelta del modello devono essere fatti sul TRAIN, il test solo per la convalida finale      
       model = SVC(random_state=self.seed)
+      
+      # Leave One out 
+      if train:
+         y_true_train,y_pred_train = self.__LeaveOneOut__(modello=model)
+         self.SupportVectorClassifierResults_train  = evaluate_performance.performance_binary(test_y = y_true_train,
+                                                                                             predizioni = y_pred_train,
+                                                                                             labels_float = self.labels,
+                                                                                             verbose = verbose
+                                                                                             )
+      else:
+         self.SupportVectorClassifierResults_train = {"df_report":pd.DataFrame(),
+                                                      "df_report_cm":pd.DataFrame(),
+                                                      "confusion_matrix":pd.DataFrame()
+                                                      }
 
+      # TEST del modello su DATI NUOVI (test dataset)
+      # Definizion del modello (ignorata definizione hyper parameters)
       # Addestramento del modello su dati di train
       model.fit(self.train_X, self.train_Y)
 
@@ -247,18 +321,38 @@ class Evaluate:
       self.SupportVectorClassifierKFold_called = True
 
    def LogisticRegression(self,
+                          train: bool = False,
                           verbose : bool = False):                          
       """ 
       Funzione per richiamare la Logistic Regression.
       Classificazione binaria che utilizza i TRAIN e TEST specificati nell'inizializzazione della classe.
       Parametri:
          - verbose (opzionale, booleano), se True più output mostrato a schermo.
+         - train (opzionale, booleano), se True viene testato il modello anche sul train set.
       """
       if not isinstance(verbose,bool):
          raise TypeError("'verbose' deve essere un booleano")      
+      
+      if not isinstance(train,bool):
+         raise TypeError("'train' deve essere un booleano")   
+
       # Definizion del modello (ignorata definizione hyper parameters)
       model = LogisticRegression(max_iter=10000,
                                  random_state=self.seed)
+      
+      # Leave One out 
+      if train:
+         y_true_train,y_pred_train = self.__LeaveOneOut__(modello=model)
+         self.LogisticRegressionResults_train  = evaluate_performance.performance_binary(test_y = y_true_train,
+                                                                                          predizioni = y_pred_train,
+                                                                                          labels_float = self.labels,
+                                                                                          verbose = verbose
+                                                                                       )
+      else:
+         self.LogisticRegressionResults_train = {"df_report":pd.DataFrame(),
+                                                 "df_report_cm":pd.DataFrame(),
+                                                 "confusion_matrix":pd.DataFrame()
+                                                }      
 
       # Addestramento del modello su dati di train
       model.fit(self.train_X, self.train_Y)
@@ -278,15 +372,20 @@ class Evaluate:
       self.LogisticRegression_called = True
      
    def RandomForest(self,
+                    train : bool = False,
                     verbose : bool = False):            
       """
       Funzione per richiamare la Logistic Regression.
       Classificazione binaria che utilizza i TRAIN e TEST specificati nell'inizializzazione della classe.
       Parametri:
          - verbose (opzionale, booleano), se True più output mostrato a schermo.
+         - train (opzionale, booleano), se True viene testato il modello anche sul train set.
       """
       if not isinstance(verbose,bool):
          raise TypeError("'verbose' deve essere un booleano")  
+      
+      if not isinstance(train,bool):
+         raise TypeError("'train' deve essere un booleano")   
          
       # Per ora ignorati
       possibili_parametri_RF = {'n_estimators': [50, 100, 150, 200],  # Numero di alberi nella foresta
@@ -298,6 +397,23 @@ class Evaluate:
 
       # Definizion del modello (ignorata definizione hyper parameters)
       model = model = RandomForestClassifier(random_state=self.seed)
+      
+      # Leave One out 
+      if train:
+         y_true_train,y_pred_train = self.__LeaveOneOut__(modello=model)
+         self.RandomForestResults_train  = evaluate_performance.performance_binary(test_y = y_true_train,
+                                                                                          predizioni = y_pred_train,
+                                                                                          labels_float = self.labels,
+                                                                                          verbose = verbose
+                                                                                       )
+      else:
+         self.RandomForestResults_train = {"df_report":pd.DataFrame(),
+                                             "df_report_cm":pd.DataFrame(),
+                                             "confusion_matrix":pd.DataFrame()
+                                          }      
+
+      
+
 
       # Addestramento del modello su dati di train
       model.fit(self.train_X, self.train_Y)
@@ -316,15 +432,20 @@ class Evaluate:
       self.RandomForest_called = True
 
    def KNearestNeighbors(self,
+                         train : bool = False,
                          verbose : bool = False):            
       """
       Funzione per richiamare la KNearestNeighbors.
       Classificazione binaria che utilizza i TRAIN e TEST specificati nell'inizializzazione della classe.
       Parametri:
          - verbose (opzionale, booleano), se True più output mostrato a schermo.
+         - train (opzionale, booleano), se True viene testato il modello anche sul train set.
       """
       if not isinstance(verbose,bool):
          raise TypeError("'verbose' deve essere un booleano")  
+      
+      if not isinstance(train,bool):
+         raise TypeError("'train' deve essere un booleano")   
          
       # Per ora ignorati
       possibili_parametri_KNN = {'n_neighbors': [3, 5, 7, 10, 15],  # Numero di vicini da provare
@@ -334,6 +455,22 @@ class Evaluate:
 
       # Definizion del modello (ignorata definizione hyper parameters)
       model = KNeighborsClassifier() # non ha come parametro random_state
+      
+      # Leave One out 
+      if train:
+         y_true_train,y_pred_train = self.__LeaveOneOut__(modello=model)
+         self.KNearestNeighborsResults_train  = evaluate_performance.performance_binary(test_y = y_true_train,
+                                                                                          predizioni = y_pred_train,
+                                                                                          labels_float = self.labels,
+                                                                                          verbose = verbose
+                                                                                       )
+      else:
+         self.KNearestNeighborsResults_train = {"df_report":pd.DataFrame(),
+                                             "df_report_cm":pd.DataFrame(),
+                                             "confusion_matrix":pd.DataFrame()
+                                          }            
+
+
 
       # Addestramento del modello su dati di train
       model.fit(self.train_X, self.train_Y)
@@ -352,15 +489,20 @@ class Evaluate:
       self.KNearestNeighbors_called = True
 
    def NaiveBayesBinomial(self,
-                         verbose : bool = False):            
+                          train : bool = False,
+                          verbose : bool = False):            
       """
       Funzione per richiamare la Naive Bayes Binomial.
       Classificazione binaria che utilizza i TRAIN e TEST specificati nell'inizializzazione della classe.
       Parametri:
          - verbose (opzionale, booleano), se True più output mostrato a schermo.
+         - train (opzionale, booleano), se True viene testato il modello anche sul train set.
       """
       if not isinstance(verbose,bool):
          raise TypeError("'verbose' deve essere un booleano")  
+      
+      if not isinstance(train,bool):
+         raise TypeError("'train' deve essere un booleano")   
          
  
       # Per ora non utilizzati
@@ -370,7 +512,19 @@ class Evaluate:
 
       # Definizion del modello (ignorata definizione hyper parameters)
       model =  BernoulliNB() # non ha come parametro random_state
-
+      
+      if train:
+         y_true_train,y_pred_train = self.__LeaveOneOut__(modello=model)
+         self.NaiveBayesBinomialResults_train  = evaluate_performance.performance_binary(test_y = y_true_train,
+                                                                                          predizioni = y_pred_train,
+                                                                                          labels_float = self.labels,
+                                                                                          verbose = verbose
+                                                                                       )
+      else:
+         self.NaiveBayesBinomialResults_train = {"df_report":pd.DataFrame(),
+                                                "df_report_cm":pd.DataFrame(),
+                                                "confusion_matrix":pd.DataFrame()
+                                               }          
 
       # Addestramento del modello su dati di train
       model.fit(self.train_X, self.train_Y)
@@ -389,16 +543,20 @@ class Evaluate:
       self.NaiveBayesBinomial_called = True
 
    def NaiveBayesGaussian(self,
-                         verbose : bool = False):            
+                          train : bool = False,
+                          verbose : bool = False):            
       """
       Funzione per richiamare la Naive Bayes Gaussian.
       Classificazione binaria che utilizza i TRAIN e TEST specificati nell'inizializzazione della classe.
       Parametri:
          - verbose (opzionale, booleano), se True più output mostrato a schermo.
+         - train (opzionale, booleano), se True viene testato il modello anche sul train set.
       """
       if not isinstance(verbose,bool):
          raise TypeError("'verbose' deve essere un booleano")  
          
+      if not isinstance(train,bool):
+         raise TypeError("'train' deve essere un booleano")   
  
       # Possibili parametri, per ora non utilizzati
       possibili_parametri_NB_Gaussian = { 'var_smoothing': [1e-9, 1e-8, 1e-7, 1e-6]  # Parametro per regolarizzare la varianza dei dati
@@ -406,6 +564,19 @@ class Evaluate:
 
       # Definizion del modello (ignorata definizione hyper parameters)
       model =  GaussianNB() # non ha come parametro random_state
+      
+      if train:
+         y_true_train,y_pred_train = self.__LeaveOneOut__(modello=model)
+         self.NaiveBayesGaussianResults_train  = evaluate_performance.performance_binary(test_y = y_true_train,
+                                                                                          predizioni = y_pred_train,
+                                                                                          labels_float = self.labels,
+                                                                                          verbose = verbose
+                                                                                       )
+      else:
+         self.NaiveBayesGaussianResults_train = {"df_report":pd.DataFrame(),
+                                                "df_report_cm":pd.DataFrame(),
+                                                "confusion_matrix":pd.DataFrame()
+                                               }          
 
       # Addestramento del modello su dati di train
       model.fit(self.train_X, self.train_Y)
@@ -450,7 +621,10 @@ class Evaluate:
          risultati["LR"] = { "df_report":   self.LogisticRegressionResults["df_report"],
                              "df_report_cm":self.LogisticRegressionResults["df_report_cm"],
                              "parametri":   self.LogisticRegressionParameters, # Parametri di default
-                             "confusion_matrix": self.LogisticRegressionResults["confusion_matrix"]
+                             "confusion_matrix": self.LogisticRegressionResults["confusion_matrix"],
+                             "df_report_train":   self.LogisticRegressionResults_train["df_report"],
+                             "df_report_cm_train":self.LogisticRegressionResults_train["df_report_cm"],
+                             "confusion_matrix_train": self.LogisticRegressionResults_train["confusion_matrix"],
                            }
    
       # Support vector classifier
@@ -464,7 +638,11 @@ class Evaluate:
          risultati["SVC"] = { "df_report":   self.SupportVectorClassifierResults["df_report"],
                               "df_report_cm":self.SupportVectorClassifierResults["df_report_cm"],
                               "parametri" :  self.SupportVectorClassifierParameters, # Parametri di default,
-                              "confusion_matrix": self.SupportVectorClassifierResults["confusion_matrix"]
+                              "confusion_matrix": self.SupportVectorClassifierResults["confusion_matrix"],
+                              
+                              "df_report_train":   self.SupportVectorClassifierResults_train["df_report"],
+                              "df_report_cm_train":self.SupportVectorClassifierResults_train["df_report_cm"],
+                              "confusion_matrix_train": self.SupportVectorClassifierResults_train["confusion_matrix"]
                             }
 
       # Support vector classifier con ottimizzazione hyperparameters tramite KFold   
@@ -478,7 +656,11 @@ class Evaluate:
          risultati["SVC_KF"] = { "df_report":   self.SupportVectorClassifierKFoldResults["df_report"],
                                  "df_report_cm":self.SupportVectorClassifierKFoldResults["df_report_cm"],
                                  "parametri":   self.SupportVectorClassifierKFoldParametri, # In aggiunta ha i parametri migliori scelti per la classificazione,
-                                 "confusion_matrix": self.SupportVectorClassifierKFoldResults["confusion_matrix"]
+                                 "confusion_matrix": self.SupportVectorClassifierKFoldResults["confusion_matrix"],
+                                 
+                                 "df_report_train":   pd.DataFrame(),
+                                 "df_report_cm_train":pd.DataFrame(),
+                                 "confusion_matrix_train": pd.DataFrame(),
                                }       
          
       # RandomForest classifier
@@ -490,10 +672,13 @@ class Evaluate:
             display(self.RandomForestResults["df_report_cm"]) ## Risultati relativi alla classe positiva (codifica 1)
          
          risultati["RF"] = { "df_report":   self.RandomForestResults["df_report"],
-                                 "df_report_cm":self.RandomForestResults["df_report_cm"],
-                                 "parametri":   self.RandomForestParameters, # In aggiunta ha i parametri migliori scelti per la classificazione,
-                                 "confusion_matrix": self.RandomForestResults["confusion_matrix"]
-                               }       
+                             "df_report_cm":self.RandomForestResults["df_report_cm"],
+                             "parametri":   self.RandomForestParameters, # In aggiunta ha i parametri migliori scelti per la classificazione,
+                             "confusion_matrix": self.RandomForestResults["confusion_matrix"],
+                             "df_report_train":   self.RandomForestResults_train["df_report"],
+                             "df_report_cm_train":self.RandomForestResults_train["df_report_cm"],
+                             "confusion_matrix_train": self.RandomForestResults_train["confusion_matrix"],
+                           }       
             # RandomForest con ottimizzazione hyperparameters tramite KFold   
       
       # K Nearest Neighbors classifier
@@ -505,11 +690,13 @@ class Evaluate:
             display(self.KNearestNeighborsResults["df_report_cm"]) ## Risultati relativi alla classe positiva (codifica 1)
          
          risultati["KNN"] = { "df_report":   self.KNearestNeighborsResults["df_report"],
-                                 "df_report_cm":self.KNearestNeighborsResults["df_report_cm"],
-                                 "parametri":   self.KNearestNeighborsParameters, # In aggiunta ha i parametri migliori scelti per la classificazione,
-                                 "confusion_matrix": self.KNearestNeighborsResults["confusion_matrix"]
-                               }       
-         
+                              "df_report_cm":self.KNearestNeighborsResults["df_report_cm"],
+                              "parametri":   self.KNearestNeighborsParameters, # In aggiunta ha i parametri migliori scelti per la classificazione,
+                              "confusion_matrix": self.KNearestNeighborsResults["confusion_matrix"],
+                              "df_report_train":   self.KNearestNeighborsResults_train["df_report"],
+                              "df_report_cm_train":self.KNearestNeighborsResults_train["df_report_cm"],
+                              "confusion_matrix_train": self.KNearestNeighborsResults_train["confusion_matrix"]}    
+      
       # Naive Bayes Binomial
       if self.NaiveBayesBinomial_called:
          if verbose: # Se verbose = True mostra a schermo i risultati della classificazione
@@ -521,9 +708,12 @@ class Evaluate:
          risultati["NB_Binomial"] = { "df_report":   self.NaiveBayesBinomialResults["df_report"],
                                       "df_report_cm":self.NaiveBayesBinomialResults["df_report_cm"],
                                        "parametri":   self.NaiveBayesBinomialParameters, # In aggiunta ha i parametri migliori scelti per la classificazione,
-                                       "confusion_matrix": self.NaiveBayesBinomialResults["confusion_matrix"]
+                                       "confusion_matrix": self.NaiveBayesBinomialResults["confusion_matrix"],
+                                       "df_report_train":   self.NaiveBayesBinomialResults_train["df_report"],
+                                       "df_report_cm_train":self.NaiveBayesBinomialResults_train["df_report_cm"],
+                                       "confusion_matrix_train": self.NaiveBayesBinomialResults_train["confusion_matrix"]
                                     }      
-          
+         
       # Naive Bayes Gaussian
       if self.NaiveBayesGaussian_called:
          if verbose: # Se verbose = True mostra a schermo i risultati della classificazione
@@ -535,20 +725,23 @@ class Evaluate:
          risultati["NB_Gaussian"] = { "df_report":   self.NaiveBayesGaussianResults["df_report"],
                                       "df_report_cm":self.NaiveBayesGaussianResults["df_report_cm"],
                                       "parametri":   self.NaiveBayesGaussianParameters, # In aggiunta ha i parametri migliori scelti per la classificazione,
-                                      "confusion_matrix": self.NaiveBayesGaussianResults["confusion_matrix"]
+                                      "confusion_matrix": self.NaiveBayesGaussianResults["confusion_matrix"],
+                                      "df_report_train":   self.NaiveBayesGaussianResults_train["df_report"],
+                                      "df_report_cm_train":self.NaiveBayesGaussianResults_train["df_report_cm"],
+                                      "confusion_matrix_train": self.NaiveBayesGaussianResults_train["confusion_matrix"]
                                     }       
       
       self.risultati = risultati
       return risultati
    
-   def get_report(self,
-                  parametri):
-      pass
-
    def performance_summary(self, condition):
       """Estrarre dai risultati una tabella con le sole performance per una determinata condizione per ogni classificatore
          Funzione da utilizzare solo dopo get_performance.
-         condition: condizione di interesse per la quale visualizzare i risultati.   
+         Input:
+         - condition: condizione di interesse per la quale visualizzare i risultati.   
+         
+         Output:
+         - summary: pandas dataframe contenente il sommario delle performance per ogni classificatore
       """
       summary = pd.DataFrame() 
       
@@ -561,6 +754,37 @@ class Evaluate:
 
          # Inserire tutte le condizioni in un unico dataframe
          summary = pd.concat([summary,model_summary],axis=1)
+
+      summary = summary.T
+
+      return summary
+   
+   def performance_summary_train(self, condition):
+      """Estrarre dai risultati una tabella con le sole performance per una determinata condizione per ogni classificatore
+         Funzione da utilizzare solo dopo get_performance.
+         In particolare questa funzione è relativa solo alle performance ottenute sui train set.
+         è stata necessaria un'altra funzione perchè i risultati sui dati di test vengono gestiti diversamente
+         Input:
+            - condition: condizione di interesse per la quale visualizzare i risultati.   
+            
+         Output:
+            - summary: pandas dataframe contenente il sommario delle performance per ogni classificatore
+      """
+      summary = pd.DataFrame() 
+      
+      # Iterare su  ogni modello addestrato 
+      for modello in self.risultati.keys():
+         # Se per il modello in considerazione sono state calcolate le performance su dati di train
+         # il pandas dataframe risulterà con shape diversa da (0,0) perciò si può procedere con la creazione
+         # del sommario
+         if self.risultati[modello]["df_report_cm_train"].shape != (0,0):
+            
+            # Per ogni modello estrarre il sommario relativo alla condizione scelta
+            model_summary = pd.DataFrame(self.risultati[modello]["df_report_cm_train"].loc[condition])
+            model_summary.rename(columns={condition:modello},inplace=True)         
+
+            # Inserire tutte le condizioni in un unico dataframe
+            summary = pd.concat([summary,model_summary],axis=1)
 
       summary = summary.T
 
